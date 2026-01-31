@@ -4,8 +4,10 @@ python streaming_tts.py "Kokoro is an open-weight TTS model with 82 million para
 
 
 # curl
-
   curl -s -X POST http://localhost:8000/v1/audio/speech \
     -H "Content-Type: application/json" \
     -d '{"input":"Kokoro is an open-weight TTS model with 82 million parameters. Despite its lightweight architecture, it delivers comparable quality to larger models while being significantly faster and more cost-efficient. With Apache-licensed weights, Kokoro can be deployed anywhere from production environments to personal projects.", "voice":"af_heart", "stream":true, "first_chunk_chars":50, "stream_chunk_chars":220, "speed": 1.25}' \
     | ffplay -autoexit -nodisp -
+
+
+# 
