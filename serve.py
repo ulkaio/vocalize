@@ -7,11 +7,11 @@ Unified API for:
 - Text-to-Speech synthesis (Kokoro)
 
 Usage:
-    # Start server with all features
-    python serve.py --audio
+    # Start server with specific features
+    python serve.py --tts
     
-    # Or specific features
-    python serve.py --vision --audio
+    # Load all features
+    python serve.py --text --vision --stt --tts
     
 Client usage:
     # Text generation
@@ -26,7 +26,7 @@ Client usage:
     # Text-to-Speech
     curl -X POST http://localhost:8000/v1/audio/speech \
         -H "Content-Type: application/json" \
-        -d '{"input": "Hello world", "voice": "af_bella"}' \
+        -d '{"input": "Hello world", "voice": "af_bella", "speed": 1.25}' \
         --output speech.wav
 """
 
@@ -74,8 +74,10 @@ def get_config() -> dict[str, Any]:
     """
     return {
         "model_name": os.environ.get("MLX_MODEL", DEFAULT_MODEL),
+        "load_text": os.environ.get("MLX_TEXT", "").lower() == "true",
         "load_vision": os.environ.get("MLX_VISION", "").lower() == "true",
-        "load_audio": os.environ.get("MLX_AUDIO", "").lower() == "true",
+        "load_stt": os.environ.get("MLX_STT", "").lower() == "true",
+        "load_tts": os.environ.get("MLX_TTS", "").lower() == "true",
         "whisper_model": os.environ.get("MLX_WHISPER_MODEL", "base"),
     }
 
@@ -91,12 +93,12 @@ WHISPER_MODELS = {
 
 # Kokoro TTS paths
 KOKORO_MODEL_DIR = Path(__file__).parent / "models" / "kokoro"
-KOKORO_MODEL_FILE = KOKORO_MODEL_DIR / "kokoro-v0_19.onnx"
-KOKORO_VOICES_FILE = KOKORO_MODEL_DIR / "voices.bin"
+KOKORO_MODEL_FILE = KOKORO_MODEL_DIR / "kokoro-v1.0.fp16-gpu.onnx"
+KOKORO_VOICES_FILE = KOKORO_MODEL_DIR / "voices-v1.0.bin"
 
 # Available TTS voices
 TTS_VOICES = [
-    "af_bella", "af_sarah", "af_nicole", "af_sky",
+    "af_bella", "af_sarah", "af_nicole", "af_sky", "af_heart",
     "am_adam", "am_michael",
     "bf_emma", "bf_isabella",
     "bm_george", "bm_lewis",
@@ -216,6 +218,12 @@ class TTSRequest(BaseModel):
         le=1000,
         description="Approximate character count per streamed TTS chunk",
     )
+    first_chunk_chars: int = Field(
+        default=80,
+        ge=20,
+        le=500,
+        description="Smaller first chunk for faster start when streaming",
+    )
 
 
 def load_text_model(model_name: str) -> None:
@@ -308,6 +316,38 @@ def _split_text_for_streaming(text: str, target_chars: int) -> list[str]:
     return chunks
 
 
+def _split_text_with_first_chunk(
+    text: str,
+    first_chars: int,
+    rest_chars: int,
+) -> list[str]:
+    text = text.strip()
+    if not text:
+        return []
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return []
+    first_chunk: list[str] = []
+    first_len = 0
+    idx = 0
+    while idx < len(sentences):
+        sentence = sentences[idx]
+        sentence_len = len(sentence)
+        if first_chunk and first_len + sentence_len + 1 > first_chars:
+            break
+        first_chunk.append(sentence)
+        first_len += sentence_len + (1 if first_len else 0)
+        idx += 1
+        if first_len >= first_chars:
+            break
+    chunks = [" ".join(first_chunk)]
+    remaining = " ".join(sentences[idx:])
+    if remaining:
+        chunks.extend(_split_text_for_streaming(remaining, rest_chars))
+    return chunks
+
+
 def _wav_header(sample_rate: int, num_channels: int = 1, bits_per_sample: int = 16) -> bytes:
     """Create a WAV header with unknown data size for streaming."""
     byte_rate = sample_rate * num_channels * bits_per_sample // 8
@@ -357,17 +397,21 @@ async def lifespan(app: FastAPI):
     # Get config from environment variables (persists across uvicorn reloads)
     config = get_config()
     model_name = config["model_name"]
+    load_text = config["load_text"]
     load_vision = config["load_vision"]
-    load_audio = config["load_audio"]
+    load_stt = config["load_stt"]
+    load_tts = config["load_tts"]
     whisper_model = config["whisper_model"]
     
-    load_text_model(model_name)
+    if load_text:
+        load_text_model(model_name)
     
     if load_vision:
         load_vision_model("gemma")
     
-    if load_audio:
+    if load_stt:
         load_whisper_model(whisper_model)
+    if load_tts:
         load_tts_model()
     
     print("=" * 50)
@@ -615,7 +659,7 @@ async def transcribe_audio(
     if not state.whisper_model:
         raise HTTPException(
             status_code=503,
-            detail="Whisper not loaded. Start server with --audio flag",
+            detail="Whisper not loaded. Start server with --stt flag",
         )
     
     import mlx_whisper
@@ -657,7 +701,7 @@ async def text_to_speech(request: TTSRequest) -> Response:
     if state.tts_model is None:
         raise HTTPException(
             status_code=503,
-            detail="TTS not loaded. Start server with --audio flag and ensure model files exist",
+            detail="TTS not loaded. Start server with --tts flag and ensure model files exist",
         )
     
     if request.voice not in TTS_VOICES:
@@ -669,7 +713,11 @@ async def text_to_speech(request: TTSRequest) -> Response:
     import soundfile as sf
 
     if request.stream:
-        stream_chunks = _split_text_for_streaming(request.input, request.stream_chunk_chars)
+        stream_chunks = _split_text_with_first_chunk(
+            request.input,
+            request.first_chunk_chars,
+            request.stream_chunk_chars,
+        )
         if not stream_chunks:
             raise HTTPException(status_code=400, detail="Input text is empty")
 
@@ -735,14 +783,14 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Start with default model (Qwen3)
+  # Start server with no models loaded
   %(prog)s
   
-  # Load all features (vision + audio)
-  %(prog)s --vision --audio
+  # Load all features (text + vision + STT + TTS)
+  %(prog)s --text --vision --stt --tts
   
-  # Audio only (STT + TTS)
-  %(prog)s --audio
+  # TTS only
+  %(prog)s --tts
   
   # Custom port
   %(prog)s --port 8080
@@ -760,25 +808,35 @@ Client examples:
   # Text-to-Speech
   curl -X POST http://localhost:8000/v1/audio/speech \\
     -H "Content-Type: application/json" \\
-    -d '{"input": "Hello world", "voice": "af_bella"}' \\
+    -d '{"input": "Hello world", "voice": "af_bella", "speed": 1.25}' \\
     --output speech.wav
         """,
+    )
+    parser.add_argument(
+        "--text",
+        action="store_true",
+        help="Load text model (LLM)",
+    )
+    parser.add_argument(
+        "--vision",
+        action="store_true",
+        help="Load vision model (Gemma-3)",
+    )
+    parser.add_argument(
+        "--stt",
+        action="store_true",
+        help="Enable speech-to-text (Whisper)",
+    )
+    parser.add_argument(
+        "--tts",
+        action="store_true",
+        help="Enable text-to-speech (Kokoro)",
     )
     parser.add_argument(
         "-m", "--model",
         default=DEFAULT_MODEL,
         choices=["qwen", "gemma"],
         help="Text model to load (default: qwen)",
-    )
-    parser.add_argument(
-        "--vision",
-        action="store_true",
-        help="Also load vision model (Gemma-3)",
-    )
-    parser.add_argument(
-        "--audio",
-        action="store_true",
-        help="Enable audio endpoints (STT with Whisper, TTS with Kokoro)",
     )
     parser.add_argument(
         "--whisper-model",
@@ -807,8 +865,10 @@ Client examples:
     
     # Set environment variables (persist across uvicorn module reloads)
     os.environ["MLX_MODEL"] = args.model
+    os.environ["MLX_TEXT"] = "true" if args.text else ""
     os.environ["MLX_VISION"] = "true" if args.vision else ""
-    os.environ["MLX_AUDIO"] = "true" if args.audio else ""
+    os.environ["MLX_STT"] = "true" if args.stt else ""
+    os.environ["MLX_TTS"] = "true" if args.tts else ""
     os.environ["MLX_WHISPER_MODEL"] = args.whisper_model
     
     print(f"\nStarting server on http://{args.host}:{args.port}")

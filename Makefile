@@ -21,12 +21,12 @@ install:  ## Install all dependencies
 	uv pip install "numpy<2.4"
 	@echo "✓ Dependencies installed"
 
-start:  ## Start server in background (survives SSH disconnect)
+start:  ## Start server in background (TTS only)
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server on port $(PORT)..."; \
-		nohup $(PYTHON) serve.py --audio --port $(PORT) > $(LOG_FILE) 2>&1 & \
+		nohup $(PYTHON) serve.py --tts --port $(PORT) > $(LOG_FILE) 2>&1 & \
 		echo $$! > $(PID_FILE); \
 		sleep 2; \
 		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
@@ -39,12 +39,12 @@ start:  ## Start server in background (survives SSH disconnect)
 		fi \
 	fi
 
-start-full:  ## Start with all features (LLM + Vision + Audio)
+start-full:  ## Start with all features (Text + Vision + STT + TTS)
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server with all features on port $(PORT)..."; \
-		nohup $(PYTHON) serve.py --model gemma --vision --audio --port $(PORT) > $(LOG_FILE) 2>&1 & \
+		nohup $(PYTHON) serve.py --model gemma --text --vision --stt --tts --port $(PORT) > $(LOG_FILE) 2>&1 & \
 		echo $$! > $(PID_FILE); \
 		sleep 2; \
 		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
@@ -128,4 +128,3 @@ test-stt:  ## Test speech-to-text (requires test_output.wav)
 clean:  ## Remove logs and temp files
 	rm -f $(LOG_FILE) $(PID_FILE) test_output.wav output.wav
 	@echo "✓ Cleaned up"
-
