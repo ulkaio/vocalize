@@ -11,8 +11,8 @@ final class HotkeyManager {
         unregisterHotkey()
 
         var hotKeyID = EventHotKeyID(signature: OSType(bitPattern: 0x54545348), id: 1)
-        let modifiers: UInt32 = UInt32(cmdKey | shiftKey)
-        let keyCode: UInt32 = UInt32(kVK_ANSI_T)
+        let modifiers: UInt32 = UInt32(optionKey)
+        let keyCode: UInt32 = UInt32(kVK_Escape)
 
         let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
         guard status == noErr else {

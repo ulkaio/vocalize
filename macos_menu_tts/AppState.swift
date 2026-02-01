@@ -4,7 +4,7 @@ import Foundation
 final class AppState: ObservableObject {
     @Published var isPlaying = false
     @Published var isPaused = false
-    @Published var speed: Double = 1.25
+    @Published var speed: Double = 1.5
     @Published var voice: String = "af_heart"
     @Published var serverURL: String = "http://localhost:8000"
     @Published var statusText: String = "Idle"
@@ -16,7 +16,12 @@ final class AppState: ObservableObject {
     init() {
         FileLogger.shared.logSync("AppState initialized")
         hotkeyManager.onHotkey = { [weak self] in
-            self?.speakSelection()
+            guard let self else { return }
+            if self.isPlaying {
+                self.stop()
+            } else {
+                self.speakSelection()
+            }
         }
         hotkeyManager.registerHotkey()
     }
@@ -24,7 +29,7 @@ final class AppState: ObservableObject {
     func speakSelection() {
         stop()
 
-        statusText = "Copying selection..."
+        statusText = "Reading selection..."
         FileLogger.shared.logSync("Hotkey triggered: copying selection")
 
         clipboardReader.readSelectedText { [weak self] result in

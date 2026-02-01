@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0B1933888F177CD922150F71 /* StreamingAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */; };
+		28853B36F51758609F1B1B0B /* settings.local.json in Resources */ = {isa = PBXBuildFile; fileRef = ABB697EF2712FF9403875B16 /* settings.local.json */; };
 		34BBA4C28E557AAAD79CB3A8 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF8091DC6D2BD2FDBAB499 /* HotkeyManager.swift */; };
 		443F09A553707F99E40EBB0A /* ClipboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24C8BF2F740CEF3E8B57751 /* ClipboardReader.swift */; };
 		53211602225405EECCCF827F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 20E5059321FD4052AE1AF9E6 /* README.md */; };
@@ -26,6 +27,7 @@
 		64AE075E2D7A85157BF4ED55 /* FileLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileLogger.swift; sourceTree = "<group>"; };
 		833263757C5EDE06EA33DF7B /* MenuTTSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuTTSApp.swift; sourceTree = "<group>"; };
 		8B0681DF9884E6E8AE600298 /* TextSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSanitizer.swift; sourceTree = "<group>"; };
+		ABB697EF2712FF9403875B16 /* settings.local.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = settings.local.json; sourceTree = "<group>"; };
 		B7DD5B96586648F03C21E503 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		E24C8BF2F740CEF3E8B57751 /* ClipboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardReader.swift; sourceTree = "<group>"; };
 		F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingAudioPlayer.swift; sourceTree = "<group>"; };
@@ -44,6 +46,7 @@
 				20E5059321FD4052AE1AF9E6 /* README.md */,
 				F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */,
 				8B0681DF9884E6E8AE600298 /* TextSanitizer.swift */,
+				9182CB76ABF9B92053CAD3F6 /* .claude */,
 			);
 			name = macos_menu_tts;
 			path = .;
@@ -57,9 +60,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		9182CB76ABF9B92053CAD3F6 /* .claude */ = {
+			isa = PBXGroup;
+			children = (
+				ABB697EF2712FF9403875B16 /* settings.local.json */,
+			);
+			path = .claude;
+			sourceTree = "<group>";
+		};
 		CAE8B6DD3C66DAE420AC126B = {
 			isa = PBXGroup;
 			children = (
+				9182CB76ABF9B92053CAD3F6 /* .claude */,
 				461359CBFFB6A8C69DBB1A30 /* macos_menu_tts */,
 				78EF38BB3BB100059B11F514 /* Products */,
 			);
@@ -126,6 +138,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				53211602225405EECCCF827F /* README.md in Resources */,
+				28853B36F51758609F1B1B0B /* settings.local.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -26,8 +26,33 @@ final class ClipboardReader {
             return
         }
 
-        // Deep-copy pasteboard data — NSPasteboardItem can't be re-written
-        // once it's associated with a pasteboard, so we snapshot the raw bytes.
+        if let text = selectedTextViaAccessibility() {
+            completion(.success(text))
+            return
+        }
+
+        selectedTextViaClipboard(completion: completion)
+    }
+
+    private func selectedTextViaAccessibility() -> String? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let pid = app.processIdentifier
+        let appElement = AXUIElementCreateApplication(pid)
+
+        var focusedValue: AnyObject?
+        let focusedResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedValue)
+        guard focusedResult == .success else { return nil }
+        let focusedElement = focusedValue as! AXUIElement
+
+        var selectedValue: AnyObject?
+        let selectedResult = AXUIElementCopyAttributeValue(focusedElement, kAXSelectedTextAttribute as CFString, &selectedValue)
+        guard selectedResult == .success, let text = selectedValue as? String else { return nil }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func selectedTextViaClipboard(completion: @escaping (Result<String, ClipboardError>) -> Void) {
         var savedData: [[(NSPasteboard.PasteboardType, Data)]] = []
         if let items = pasteboard.pasteboardItems {
             for item in items {

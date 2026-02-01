@@ -52,7 +52,7 @@ struct MenuTTSApp: App {
 
                 Divider()
 
-                Button("Speak Selection (Cmd+Shift+T)") {
+                Button("Speak Selection (⌥ Esc)") {
                     appState.speakSelection()
                 }
 
