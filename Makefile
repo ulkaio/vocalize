@@ -24,6 +24,10 @@ install:  ## Install all dependencies (uses uv if available)
 		$(VENV)/bin/pip install -U pip; \
 		$(VENV)/bin/pip install -r requirements.txt; \
 	fi
+	@if ! command -v ffmpeg >/dev/null 2>&1; then \
+		echo "ffmpeg not found; installing via Homebrew..."; \
+		brew install ffmpeg; \
+	fi
 	@echo "✓ Dependencies installed"
 
 start:  ## Start server in background (TTS only)

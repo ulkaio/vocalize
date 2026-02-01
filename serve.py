@@ -122,7 +122,10 @@ class ModelState:
         
         # Audio models
         self.whisper_model: str = ""  # Just store the model path, mlx_whisper loads on demand
+        self.whisper_instance: Any = None
+        self.whisper_instance_name: str = ""
         self.tts_model: Any = None  # Kokoro instance
+        self._samplers: dict[float, Any] = {}
 
 
 state = ModelState()
@@ -268,6 +271,8 @@ def load_whisper_model(model_name: str = "base") -> None:
     model_path = WHISPER_MODELS.get(model_name, model_name)
     print(f"Configuring Whisper model: {model_path}")
     state.whisper_model = model_path
+    state.whisper_instance = None
+    state.whisper_instance_name = ""
     print(f"✓ Whisper configured: {model_path}")
 
 
@@ -397,6 +402,26 @@ def _split_text_mid(text: str) -> tuple[str, str] | None:
         return None
     mid = len(words) // 2
     return " ".join(words[:mid]), " ".join(words[mid:])
+
+
+def _get_sampler(temperature: float) -> Any:
+    """Cache samplers per temperature to avoid re-creating per request."""
+    sampler = state._samplers.get(temperature)
+    if sampler is None:
+        sampler = make_sampler(temp=temperature)
+        state._samplers[temperature] = sampler
+    return sampler
+
+
+def _get_whisper_instance(model_path: str) -> Any:
+    """Load and cache Whisper model instance if supported by mlx_whisper."""
+    if state.whisper_instance is not None and state.whisper_instance_name == model_path:
+        return state.whisper_instance
+    import mlx_whisper
+    if hasattr(mlx_whisper, "load_model"):
+        state.whisper_instance = mlx_whisper.load_model(model_path)
+        state.whisper_instance_name = model_path
+    return state.whisper_instance
 
 
 def _iter_tts_samples(text: str, voice: str, speed: float) -> Iterator[tuple[np.ndarray, int]]:
@@ -552,7 +577,7 @@ async def chat_completions(request: ChatCompletionRequest) -> ChatCompletionResp
         formatted_prompt = messages[-1]["content"] if messages else ""
     
     # Create sampler and generate
-    sampler = make_sampler(temp=request.temperature)
+    sampler = _get_sampler(request.temperature)
     
     response_text = lm_generate(
         state.text_model,
@@ -700,23 +725,27 @@ async def transcribe_audio(
             detail="Whisper not loaded. Start server with --stt flag",
         )
     
+    import inspect
+    import shutil
     import mlx_whisper
     
     # Save uploaded file to temp location
     suffix = Path(file.filename or "audio.wav").suffix
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        content = await file.read()
-        tmp.write(content)
+        file.file.seek(0)
+        shutil.copyfileobj(file.file, tmp)
         tmp_path = tmp.name
     
     try:
         # Use configured model or override from request
         model_path = WHISPER_MODELS.get(model, state.whisper_model)
         
-        result = mlx_whisper.transcribe(
-            tmp_path,
-            path_or_hf_repo=model_path,
-        )
+        whisper_instance = _get_whisper_instance(model_path)
+        signature = inspect.signature(mlx_whisper.transcribe)
+        if whisper_instance is not None and "model" in signature.parameters:
+            result = mlx_whisper.transcribe(tmp_path, model=whisper_instance)
+        else:
+            result = mlx_whisper.transcribe(tmp_path, path_or_hf_repo=model_path)
         
         return TranscriptionResponse(text=result["text"].strip())
     finally:
