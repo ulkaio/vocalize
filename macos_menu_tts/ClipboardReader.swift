@@ -26,7 +26,20 @@ final class ClipboardReader {
             return
         }
 
-        let savedItems = pasteboard.pasteboardItems
+        // Deep-copy pasteboard data — NSPasteboardItem can't be re-written
+        // once it's associated with a pasteboard, so we snapshot the raw bytes.
+        var savedData: [[(NSPasteboard.PasteboardType, Data)]] = []
+        if let items = pasteboard.pasteboardItems {
+            for item in items {
+                var pairs: [(NSPasteboard.PasteboardType, Data)] = []
+                for type in item.types {
+                    if let data = item.data(forType: type) {
+                        pairs.append((type, data))
+                    }
+                }
+                savedData.append(pairs)
+            }
+        }
         let previousChangeCount = pasteboard.changeCount
 
         let source = CGEventSource(stateID: .combinedSessionState)
@@ -49,8 +62,15 @@ final class ClipboardReader {
                 let text = self.pasteboard.string(forType: .string) ?? ""
 
                 self.pasteboard.clearContents()
-                if let savedItems {
-                    self.pasteboard.writeObjects(savedItems)
+                if !savedData.isEmpty {
+                    let newItems = savedData.map { pairs -> NSPasteboardItem in
+                        let item = NSPasteboardItem()
+                        for (type, data) in pairs {
+                            item.setData(data, forType: type)
+                        }
+                        return item
+                    }
+                    self.pasteboard.writeObjects(newItems)
                 }
 
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

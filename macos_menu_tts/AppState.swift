@@ -14,6 +14,7 @@ final class AppState: ObservableObject {
     private let audioPlayer = StreamingAudioPlayer()
 
     init() {
+        FileLogger.shared.logSync("AppState initialized")
         hotkeyManager.onHotkey = { [weak self] in
             self?.speakSelection()
         }
@@ -24,20 +25,32 @@ final class AppState: ObservableObject {
         stop()
 
         statusText = "Copying selection..."
+        FileLogger.shared.logSync("Hotkey triggered: copying selection")
+
         clipboardReader.readSelectedText { [weak self] result in
             guard let self else { return }
             switch result {
             case .failure(let error):
                 self.statusText = error.localizedDescription
+                FileLogger.shared.logSync("Clipboard error: \(error.localizedDescription)")
                 return
             case .success(let text):
+                let sanitized = TextSanitizer.sanitize(text)
+                if sanitized.isEmpty {
+                    self.statusText = "No speakable text"
+                    FileLogger.shared.logSync("Sanitizer removed all content")
+                    return
+                }
+
                 self.statusText = "Streaming"
                 self.isPlaying = true
                 self.isPaused = false
 
+                FileLogger.shared.logSync("Starting stream: chars=\(sanitized.count)")
+
                 self.audioPlayer.startStream(
                     serverURL: self.serverURL,
-                    text: text,
+                    text: sanitized,
                     voice: self.voice,
                     speed: self.speed,
                     firstChunkChars: 80,
@@ -47,8 +60,10 @@ final class AppState: ObservableObject {
                     switch result {
                     case .success:
                         self.statusText = "Finished"
+                        FileLogger.shared.logSync("Stream finished")
                     case .failure(let error):
                         self.statusText = "Error: \(error.localizedDescription)"
+                        FileLogger.shared.logSync("Stream error: \(error.localizedDescription)")
                     }
                     self.isPlaying = false
                     self.isPaused = false
@@ -62,6 +77,7 @@ final class AppState: ObservableObject {
         audioPlayer.pause()
         isPaused = true
         statusText = "Paused"
+        FileLogger.shared.logSync("Playback paused")
     }
 
     func resume() {
@@ -69,12 +85,14 @@ final class AppState: ObservableObject {
         audioPlayer.resume()
         isPaused = false
         statusText = "Streaming"
+        FileLogger.shared.logSync("Playback resumed")
     }
 
     func stop() {
         audioPlayer.stop()
         if isPlaying {
             statusText = "Stopped"
+            FileLogger.shared.logSync("Playback stopped")
         }
         isPlaying = false
         isPaused = false

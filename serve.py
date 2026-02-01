@@ -41,7 +41,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, Sequence
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -379,6 +379,44 @@ def _float_to_int16_bytes(samples: np.ndarray) -> bytes:
     return pcm.tobytes()
 
 
+def _available_tts_voices() -> Sequence[str]:
+    """Return available voices from the loaded model if possible."""
+    if state.tts_model is not None and hasattr(state.tts_model, "voices"):
+        voices_obj = state.tts_model.voices
+        if hasattr(voices_obj, "keys"):
+            try:
+                return sorted(list(voices_obj.keys()))
+            except Exception:
+                return TTS_VOICES
+    return TTS_VOICES
+
+
+def _split_text_mid(text: str) -> tuple[str, str] | None:
+    words = text.split()
+    if len(words) < 2:
+        return None
+    mid = len(words) // 2
+    return " ".join(words[:mid]), " ".join(words[mid:])
+
+
+def _iter_tts_samples(text: str, voice: str, speed: float) -> Iterator[tuple[np.ndarray, int]]:
+    """Create TTS audio, splitting text further if kokoro hits max phoneme length."""
+    try:
+        samples, sample_rate = state.tts_model.create(
+            text,
+            voice=voice,
+            speed=speed,
+        )
+        yield samples, sample_rate
+    except IndexError:
+        parts = _split_text_mid(text)
+        if not parts:
+            raise
+        left, right = parts
+        yield from _iter_tts_samples(left, voice, speed)
+        yield from _iter_tts_samples(right, voice, speed)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load models on startup, cleanup on shutdown.
@@ -704,10 +742,11 @@ async def text_to_speech(request: TTSRequest) -> Response:
             detail="TTS not loaded. Start server with --tts flag and ensure model files exist",
         )
     
-    if request.voice not in TTS_VOICES:
+    available_voices = _available_tts_voices()
+    if request.voice not in available_voices:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid voice. Available: {', '.join(TTS_VOICES)}",
+            detail=f"Invalid voice. Available: {', '.join(available_voices)}",
         )
     
     import soundfile as sf
@@ -722,25 +761,25 @@ async def text_to_speech(request: TTSRequest) -> Response:
             raise HTTPException(status_code=400, detail="Input text is empty")
 
         def generate_stream() -> Iterator[bytes]:
-            first_samples, sample_rate = state.tts_model.create(
-                stream_chunks[0],
-                voice=request.voice,
-                speed=request.speed,
-            )
-            yield _wav_header(sample_rate)
-            pcm_bytes = _float_to_int16_bytes(first_samples)
-            for i in range(0, len(pcm_bytes), 8192):
-                yield pcm_bytes[i:i + 8192]
-
-            for chunk in stream_chunks[1:]:
-                samples, _ = state.tts_model.create(
-                    chunk,
-                    voice=request.voice,
-                    speed=request.speed,
-                )
-                pcm_bytes = _float_to_int16_bytes(samples)
-                for i in range(0, len(pcm_bytes), 8192):
-                    yield pcm_bytes[i:i + 8192]
+            first_yield = True
+            for text_chunk in stream_chunks:
+                try:
+                    for samples, sample_rate in _iter_tts_samples(
+                        text_chunk,
+                        request.voice,
+                        request.speed,
+                    ):
+                        if first_yield:
+                            yield _wav_header(sample_rate)
+                            first_yield = False
+                        pcm_bytes = _float_to_int16_bytes(samples)
+                        for i in range(0, len(pcm_bytes), 8192):
+                            yield pcm_bytes[i:i + 8192]
+                except IndexError as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="TTS chunk too long; reduce stream_chunk_chars or first_chunk_chars",
+                    ) from exc
 
         return StreamingResponse(
             generate_stream(),
@@ -749,11 +788,20 @@ async def text_to_speech(request: TTSRequest) -> Response:
         )
 
     # Non-streaming: generate full audio then return WAV
-    samples, sample_rate = state.tts_model.create(
-        request.input,
-        voice=request.voice,
-        speed=request.speed,
-    )
+    try:
+        parts: list[np.ndarray] = []
+        sample_rate = 0
+        for samples, rate in _iter_tts_samples(request.input, request.voice, request.speed):
+            parts.append(samples)
+            sample_rate = rate
+        if not parts:
+            raise HTTPException(status_code=400, detail="Input text is empty")
+        samples = np.concatenate(parts)
+    except IndexError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="TTS text too long; try shorter input or enable streaming",
+        ) from exc
 
     buffer = io.BytesIO()
     sf.write(buffer, samples, sample_rate, format="WAV")
@@ -773,7 +821,7 @@ async def list_voices() -> dict[str, list[str]]:
     Returns:
         Dictionary with list of available voice IDs.
     """
-    return {"voices": TTS_VOICES}
+    return {"voices": list(_available_tts_voices())}
 
 
 def main() -> None:

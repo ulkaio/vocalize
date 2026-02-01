@@ -15,8 +15,8 @@ project:  ## Generate Xcode project (requires xcodegen)
 	fi
 	xcodegen generate
 
-build:  ## Build the app
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG) -derivedDataPath $(BUILD_DIR)
+build: project  ## Build the app
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG) -derivedDataPath $(BUILD_DIR) -destination "platform=macOS"
 
 run:  ## Build and run the app
 	@$(MAKE) build
@@ -29,4 +29,4 @@ install:  ## Install app to /Applications (for stable permissions)
 	@cp -R $(BUILD_DIR)/Build/Products/$(CONFIG)/$(APP_NAME).app $(INSTALL_DIR)/
 
 clean:  ## Remove build artifacts
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(PROJECT)

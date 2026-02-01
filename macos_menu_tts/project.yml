@@ -24,6 +24,8 @@ targets:
         excludes:
           - "project.yml"
           - "Makefile"
+          - "build"
+          - "MenuTTS.xcodeproj"
           - "Info.plist"
     settings:
       base:

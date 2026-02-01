@@ -32,7 +32,7 @@ final class StreamingAudioPlayer: NSObject {
         stop()
         self.completion = completion
         isStopping = false
-        pendingData.removeAll(keepingCapacity: true)
+        pendingData = Data()
         audioFormat = nil
         bytesPerFrame = 0
 
@@ -59,6 +59,8 @@ final class StreamingAudioPlayer: NSObject {
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         urlSession = session
 
+        FileLogger.shared.logSync("Sending stream request to \(url.absoluteString)")
+
         let task = session.dataTask(with: request)
         self.task = task
         task.resume()
@@ -80,11 +82,17 @@ final class StreamingAudioPlayer: NSObject {
         task = nil
         urlSession?.invalidateAndCancel()
         urlSession = nil
-        player.stop()
-        engine.stop()
-        pendingData.removeAll(keepingCapacity: true)
-        audioFormat = nil
-        bytesPerFrame = 0
+        // Engine/player ops must happen on sessionQueue where the delegate
+        // also drives them — AVAudioEngine is not thread-safe.
+        sessionQueue.sync {
+            self.player.stop()
+            self.engine.stop()
+            self.engine.disconnectNodeOutput(self.player)
+            self.pendingData = Data()
+            self.audioFormat = nil
+            self.bytesPerFrame = 0
+        }
+        completion = nil
     }
 }
 
@@ -125,6 +133,7 @@ extension StreamingAudioPlayer: URLSessionDataDelegate {
             guard let self else { return }
             if self.isStopping { return }
             if let error {
+                FileLogger.shared.logSync("Stream completed with error: \(error.localizedDescription)")
                 self.finish(with: .failure(error))
                 return
             }
@@ -150,7 +159,7 @@ extension StreamingAudioPlayer: URLSessionDataDelegate {
             let remainingFrames = pendingData.count / bytesPerFrame
             if remainingFrames > 0 {
                 let chunk = pendingData.prefix(remainingFrames * bytesPerFrame)
-                pendingData.removeAll(keepingCapacity: true)
+                pendingData = Data()
                 enqueueBuffer(chunk, format: format, frameCount: remainingFrames)
             }
         }
@@ -181,21 +190,23 @@ extension StreamingAudioPlayer: URLSessionDataDelegate {
     }
 
     private static func parseWavHeader(_ data: Data) -> AVAudioFormat? {
-        if data.count < 44 { return nil }
+        guard data.count >= 44 else { return nil }
+        // Re-base to zero-indexed Data so hardcoded offsets are safe
+        let h = Data(data.prefix(44))
 
-        let riff = String(data: data[0..<4], encoding: .ascii)
-        let wave = String(data: data[8..<12], encoding: .ascii)
-        let fmt = String(data: data[12..<16], encoding: .ascii)
-        let dataTag = String(data: data[36..<40], encoding: .ascii)
+        let riff = String(data: h[0..<4], encoding: .ascii)
+        let wave = String(data: h[8..<12], encoding: .ascii)
+        let fmt = String(data: h[12..<16], encoding: .ascii)
+        let dataTag = String(data: h[36..<40], encoding: .ascii)
 
         guard riff == "RIFF", wave == "WAVE", fmt == "fmt ", dataTag == "data" else {
             return nil
         }
 
-        let audioFormat = data.toUInt16LE(at: 20)
-        let numChannels = data.toUInt16LE(at: 22)
-        let sampleRate = data.toUInt32LE(at: 24)
-        let bitsPerSample = data.toUInt16LE(at: 34)
+        let audioFormat = h.toUInt16LE(at: 20)
+        let numChannels = h.toUInt16LE(at: 22)
+        let sampleRate = h.toUInt32LE(at: 24)
+        let bitsPerSample = h.toUInt16LE(at: 34)
 
         guard audioFormat == 1, numChannels == 1, bitsPerSample == 16 else {
             return nil

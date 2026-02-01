@@ -10,14 +10,22 @@
 		0B1933888F177CD922150F71 /* StreamingAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */; };
 		34BBA4C28E557AAAD79CB3A8 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF8091DC6D2BD2FDBAB499 /* HotkeyManager.swift */; };
 		443F09A553707F99E40EBB0A /* ClipboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24C8BF2F740CEF3E8B57751 /* ClipboardReader.swift */; };
+		53211602225405EECCCF827F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 20E5059321FD4052AE1AF9E6 /* README.md */; };
 		95A1F4723FFF7923D85C91D9 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DD5B96586648F03C21E503 /* AppState.swift */; };
 		D5C4102E4E34130A6C8067E1 /* MenuTTSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833263757C5EDE06EA33DF7B /* MenuTTSApp.swift */; };
+		EA266D6C71A2B17DFEECAAB6 /* FileLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AE075E2D7A85157BF4ED55 /* FileLogger.swift */; };
+		EA3AE1DF31FC80A2A01CB5F8 /* TextSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B0681DF9884E6E8AE600298 /* TextSanitizer.swift */; };
+		F6C818F2BB3070DD402BC4D4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F5550B3865B25BF28DD703B /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		20E5059321FD4052AE1AF9E6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		2F5550B3865B25BF28DD703B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		33FF8091DC6D2BD2FDBAB499 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		5593B78FE3794316EB40D54F /* MenuTTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MenuTTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		64AE075E2D7A85157BF4ED55 /* FileLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileLogger.swift; sourceTree = "<group>"; };
 		833263757C5EDE06EA33DF7B /* MenuTTSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuTTSApp.swift; sourceTree = "<group>"; };
+		8B0681DF9884E6E8AE600298 /* TextSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSanitizer.swift; sourceTree = "<group>"; };
 		B7DD5B96586648F03C21E503 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		E24C8BF2F740CEF3E8B57751 /* ClipboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardReader.swift; sourceTree = "<group>"; };
 		F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingAudioPlayer.swift; sourceTree = "<group>"; };
@@ -27,11 +35,15 @@
 		461359CBFFB6A8C69DBB1A30 /* macos_menu_tts */ = {
 			isa = PBXGroup;
 			children = (
+				2F5550B3865B25BF28DD703B /* AppDelegate.swift */,
 				B7DD5B96586648F03C21E503 /* AppState.swift */,
 				E24C8BF2F740CEF3E8B57751 /* ClipboardReader.swift */,
+				64AE075E2D7A85157BF4ED55 /* FileLogger.swift */,
 				33FF8091DC6D2BD2FDBAB499 /* HotkeyManager.swift */,
 				833263757C5EDE06EA33DF7B /* MenuTTSApp.swift */,
+				20E5059321FD4052AE1AF9E6 /* README.md */,
 				F7D03F9C97A745999F531414 /* StreamingAudioPlayer.swift */,
+				8B0681DF9884E6E8AE600298 /* TextSanitizer.swift */,
 			);
 			name = macos_menu_tts;
 			path = .;
@@ -61,6 +73,7 @@
 			buildConfigurationList = 85AA40F4B9EFBCB4A2F5F851 /* Build configuration list for PBXNativeTarget "MenuTTS" */;
 			buildPhases = (
 				B8A6D5931FED9EE7F923FE8C /* Sources */,
+				D55B3F6162CD2F361CAE89A8 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -107,16 +120,30 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		D55B3F6162CD2F361CAE89A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53211602225405EECCCF827F /* README.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		B8A6D5931FED9EE7F923FE8C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6C818F2BB3070DD402BC4D4 /* AppDelegate.swift in Sources */,
 				95A1F4723FFF7923D85C91D9 /* AppState.swift in Sources */,
 				443F09A553707F99E40EBB0A /* ClipboardReader.swift in Sources */,
+				EA266D6C71A2B17DFEECAAB6 /* FileLogger.swift in Sources */,
 				34BBA4C28E557AAAD79CB3A8 /* HotkeyManager.swift in Sources */,
 				D5C4102E4E34130A6C8067E1 /* MenuTTSApp.swift in Sources */,
 				0B1933888F177CD922150F71 /* StreamingAudioPlayer.swift in Sources */,
+				EA3AE1DF31FC80A2A01CB5F8 /* TextSanitizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
