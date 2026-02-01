@@ -7,6 +7,10 @@ PYTHON := $(VENV)/bin/python
 PID_FILE := .server.pid
 LOG_FILE := server.log
 PORT := 8000
+KOKORO_DIR := models/kokoro
+KOKORO_FP16 := $(KOKORO_DIR)/kokoro-v1.0.fp16-gpu.onnx
+KOKORO_VOICES := $(KOKORO_DIR)/voices-v1.0.bin
+KOKORO_FP16_URL := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.fp16-gpu.onnx
 
 .PHONY: help install start start-full stop restart status logs tail clean
 
@@ -28,6 +32,7 @@ install:  ## Install all dependencies (uses uv if available)
 		echo "ffmpeg not found; installing via Homebrew..."; \
 		brew install ffmpeg; \
 	fi
+	@$(MAKE) kokoro-model
 	@echo "✓ Dependencies installed"
 
 start:  ## Start server in background (TTS only)
@@ -143,3 +148,13 @@ test-stt:  ## Test speech-to-text (requires test_output.wav)
 clean:  ## Remove logs and temp files
 	rm -f $(LOG_FILE) $(PID_FILE) test_output.wav output.wav
 	@echo "✓ Cleaned up"
+
+kokoro-model:  ## Download Kokoro TTS model files
+	@mkdir -p $(KOKORO_DIR)
+	@if [ ! -f $(KOKORO_FP16) ]; then \
+		echo "Downloading Kokoro model..."; \
+		curl -L -o $(KOKORO_FP16) $(KOKORO_FP16_URL); \
+	fi
+	@if [ ! -f $(KOKORO_VOICES) ]; then \
+		echo "Missing $(KOKORO_VOICES). Please download it separately."; \
+	fi
