@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>MenuTTS</string>
+    <string>Vocalize</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.MenuTTS</string>
+    <string>com.example.Vocalize</string>
     <key>CFBundleName</key>
-    <string>MenuTTS</string>
+    <string>Vocalize</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundleVersion</key>
@@ -21,5 +21,7 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Vocalize needs microphone access for speech-to-text dictation. Hold Fn key to dictate.</string>
 </dict>
 </plist>

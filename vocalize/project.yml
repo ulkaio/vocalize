@@ -1,4 +1,4 @@
-name: MenuTTS
+name: Vocalize
 options:
   bundleIdPrefix: com.example
   deploymentTarget:
@@ -6,7 +6,7 @@ options:
 
 settings:
   base:
-    PRODUCT_BUNDLE_IDENTIFIER: com.example.MenuTTS
+    PRODUCT_BUNDLE_IDENTIFIER: com.example.Vocalize
     MARKETING_VERSION: 1.0
     CURRENT_PROJECT_VERSION: 1
 
@@ -15,7 +15,7 @@ configs:
   Release: release
 
 targets:
-  MenuTTS:
+  Vocalize:
     type: application
     platform: macOS
     deploymentTarget: '13.0'
@@ -25,8 +25,9 @@ targets:
           - "project.yml"
           - "Makefile"
           - "build"
-          - "MenuTTS.xcodeproj"
+          - "Vocalize.xcodeproj"
           - "Info.plist"
+          - "Vocalize.entitlements"
     settings:
       base:
         INFOPLIST_FILE: Info.plist
@@ -34,4 +35,5 @@ targets:
         DEVELOPMENT_TEAM: ""
         SWIFT_VERSION: 5.9
         ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: Vocalize.entitlements
         COMBINE_HIDPI_IMAGES: YES

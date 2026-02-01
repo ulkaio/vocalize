@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-APP_NAME := MenuTTS
+APP_NAME := Vocalize
 PROJECT := $(APP_NAME).xcodeproj
 SCHEME := $(APP_NAME)
 CONFIG ?= Release

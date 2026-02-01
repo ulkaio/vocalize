@@ -1,18 +1,26 @@
 import SwiftUI
 
 @main
-struct MenuTTSApp: App {
+struct VocalizeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
 
     var body: some Scene {
-        MenuBarExtra("TTS", systemImage: "speaker.wave.2") {
+        MenuBarExtra("Vocalize", systemImage: menuBarIcon) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(appState.statusText)
-                    .font(.caption)
+                // Status text with dictation indicator
+                HStack {
+                    if appState.isDictating {
+                        Image(systemName: "mic.fill")
+                            .foregroundColor(.red)
+                    }
+                    Text(appState.statusText)
+                        .font(.caption)
+                }
 
                 Divider()
 
+                // TTS Controls
                 HStack {
                     Button(appState.isPaused ? "Play" : "Pause") {
                         if appState.isPaused {
@@ -27,6 +35,13 @@ struct MenuTTSApp: App {
                         appState.stop()
                     }
                     .disabled(!appState.isPlaying)
+                }
+
+                // Dictation cancel button (only shown when dictating)
+                if appState.isDictating {
+                    Button("Cancel Dictation") {
+                        appState.cancelDictation()
+                    }
                 }
 
                 Divider()
@@ -52,8 +67,14 @@ struct MenuTTSApp: App {
 
                 Divider()
 
-                Button("Speak Selection (⌥ Esc)") {
-                    appState.speakSelection()
+                // Hotkey hints
+                VStack(alignment: .leading, spacing: 4) {
+                    Button("Speak Selection (⌥ Esc)") {
+                        appState.speakSelection()
+                    }
+                    Text("Hold Fn to dictate")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
 
                 Button("Quit") {
@@ -61,6 +82,17 @@ struct MenuTTSApp: App {
                 }
             }
             .padding(12)
+        }
+    }
+
+    /// Menu bar icon changes based on state.
+    private var menuBarIcon: String {
+        if appState.isDictating {
+            return "waveform.badge.mic"
+        } else if appState.isPlaying {
+            return "waveform"
+        } else {
+            return "waveform"
         }
     }
 }

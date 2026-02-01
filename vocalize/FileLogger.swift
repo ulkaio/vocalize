@@ -9,7 +9,7 @@ final class FileLogger {
     private init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let logsDir = home.appendingPathComponent("Library/Logs", isDirectory: true)
-        logURL = logsDir.appendingPathComponent("MenuTTS.log")
+        logURL = logsDir.appendingPathComponent("Vocalize.log")
     }
 
     func log(_ message: String) {

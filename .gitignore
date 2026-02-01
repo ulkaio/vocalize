@@ -38,9 +38,17 @@ server.log
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
+
+# Xcode
+*.xcodeproj/
+xcuserdata/
+*.xcworkspace/
+DerivedData/
+*.dSYM/
 
 # OS
 .DS_Store

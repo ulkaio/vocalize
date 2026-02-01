@@ -26,7 +26,7 @@ start:  ## Start server in background (TTS only)
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server on port $(PORT)..."; \
-		nohup $(PYTHON) serve.py --tts --port $(PORT) > $(LOG_FILE) 2>&1 & \
+		nohup $(PYTHON) serve.py --tts --stt --port $(PORT) > $(LOG_FILE) 2>&1 & \
 		echo $$! > $(PID_FILE); \
 		sleep 2; \
 		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
