@@ -13,30 +13,13 @@
 brew install python@3.12 ffmpeg
 ```
 
-### 2. Create virtual environment with Python 3.12
+### 2. Install dependencies (recommended)
 
 ```bash
-uv venv --python python3.12
+make install
 ```
 
-### 3. Activate it
-
-```bash
-source .venv/bin/activate
-```
-
-### 4. Install dependencies
-
-```bash
-# Core ML packages
-uv pip install -U mlx-lm mlx-vlm mlx-whisper mlx-audio
-
-# HTTP server (for serve.py)
-uv pip install fastapi uvicorn pydantic
-
-# TTS (for tts.py)
-uv pip install kokoro-onnx soundfile
-```
+This uses `uv` if available, and falls back to `venv + pip` otherwise, installing from `requirements.txt`.
 
 ## Installed Versions
 

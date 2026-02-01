@@ -8,21 +8,29 @@ PID_FILE := .server.pid
 LOG_FILE := server.log
 PORT := 8000
 
-.PHONY: help install start stop restart status logs tail clean
+.PHONY: help install start start-full stop restart status logs tail clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-install:  ## Install all dependencies
-	uv venv --python python3.12
-	uv pip install -U mlx-lm mlx-vlm mlx-whisper
-	uv pip install fastapi uvicorn pydantic
-	uv pip install kokoro-onnx soundfile
-	uv pip install "numpy<2.4"
+install:  ## Install all dependencies (uses uv if available)
+	@if command -v uv >/dev/null 2>&1; then \
+		echo "Using uv..."; \
+		uv venv --python python3.12; \
+		uv pip install -r requirements.txt; \
+	else \
+		echo "uv not found; falling back to venv + pip..."; \
+		python3.12 -m venv $(VENV); \
+		$(VENV)/bin/pip install -U pip; \
+		$(VENV)/bin/pip install -r requirements.txt; \
+	fi
 	@echo "✓ Dependencies installed"
 
 start:  ## Start server in background (TTS only)
-	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
+	@if [ ! -x $(PYTHON) ]; then \
+		echo "Missing virtualenv. Run 'make install' first."; \
+		exit 1; \
+	elif [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server on port $(PORT)..."; \
@@ -40,7 +48,10 @@ start:  ## Start server in background (TTS only)
 	fi
 
 start-full:  ## Start with all features (Text + Vision + STT + TTS)
-	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
+	@if [ ! -x $(PYTHON) ]; then \
+		echo "Missing virtualenv. Run 'make install' first."; \
+		exit 1; \
+	elif [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server with all features on port $(PORT)..."; \

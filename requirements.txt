@@ -1,0 +1,10 @@
+fastapi
+kokoro-onnx
+mlx-audio
+mlx-lm
+mlx-vlm
+mlx-whisper
+numpy<2.4
+pydantic
+soundfile
+uvicorn
