@@ -192,6 +192,8 @@ def interactive_chat(
             )
         else:
             formatted_prompt = user_input
+        # Debug: print the formatted prompt
+        print(f"\nFormatted prompt: {formatted_prompt}")
 
         # Generate response
         print("\nAssistant: ", end="", flush=True)
@@ -319,4 +321,7 @@ Models:
 
 
 if __name__ == "__main__":
+    # For debugging: simulate CLI args so stepping through works like:
+    #   uv run python3 generate.py "what is python?"
+    sys.argv = [sys.argv[0], "-i", "what is python?"]
     main()

@@ -5,6 +5,7 @@ mlx-lm
 mlx-vlm
 mlx-whisper
 numpy<2.4
+openai-agents
 pydantic
 soundfile
 uvicorn
