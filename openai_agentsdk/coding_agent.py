@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import subprocess
@@ -35,11 +36,19 @@ from agents import (
     Agent,
     ModelSettings,
     OpenAIChatCompletionsModel,
+    RunConfig,
     Runner,
     function_tool,
     set_tracing_export_api_key,
     trace,
 )
+from agents.items import (
+    MessageOutputItem,
+    ReasoningItem,
+    ToolCallItem,
+    ToolCallOutputItem,
+)
+from agents.stream_events import RunItemStreamEvent, StreamEvent
 from openai import AsyncOpenAI
 
 # ---------------------------------------------------------------------------
@@ -75,8 +84,11 @@ def _configure_logging(verbose: bool = False) -> None:
 # ---------------------------------------------------------------------------
 
 NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+# MODEL_NAME: str = "qwen/qwen3-next-80b-a3b-instruct"
+# MODEL_NAME: str = "z-ai/glm4.7"
 MODEL_NAME: str = "moonshotai/kimi-k2.5"
 WORKSPACE_ROOT: Path = Path.cwd().resolve()
+TRACE_INCLUDE_SENSITIVE_DATA: bool = True
 
 SYSTEM_PROMPT: str = (
     "You are a coding agent with access to workspace tools. "
@@ -354,6 +366,10 @@ def _setup_tracing() -> None:
     openai_key: str = os.environ.get("OPENAI_API_KEY", "")
     if openai_key:
         set_tracing_export_api_key(openai_key)
+        _patch_tracing_export_usage_keys()
+        logger.warning(
+            "OpenAI tracing enabled. Trace payload will include agent input/output."
+        )
         logger.debug("Tracing enabled — exporting to OpenAI dashboard.")
     else:
         logger.debug(
@@ -361,17 +377,49 @@ def _setup_tracing() -> None:
         )
 
 
-def _build_agent(client: AsyncOpenAI) -> Agent:
+def _patch_tracing_export_usage_keys() -> None:
+    """Apply a local compatibility patch for trace usage fields.
+
+    Some tracing ingest endpoints reject newer usage fields such as
+    ``span_data.usage.total_tokens`` and token detail objects.
+    We remove unsupported keys from the exporter sanitization allowlist so
+    payloads remain accepted while preserving basic input/output token counts.
+    """
+    try:
+        from agents.tracing.processors import default_exporter
+
+        exporter = default_exporter()
+        allowed = getattr(exporter, "_OPENAI_TRACING_ALLOWED_USAGE_KEYS", None)
+        unsupported_usage_keys: frozenset[str] = frozenset(
+            {"total_tokens", "input_tokens_details", "output_tokens_details"}
+        )
+        if isinstance(allowed, frozenset):
+            patched = frozenset(
+                key for key in allowed if key not in unsupported_usage_keys
+            )
+            setattr(exporter, "_OPENAI_TRACING_ALLOWED_USAGE_KEYS", patched)
+            removed = sorted(set(allowed) - set(patched))
+            if removed:
+                logger.debug(
+                    "Applied tracing usage compatibility patch (removed: %s).",
+                    ", ".join(removed),
+                )
+    except Exception as exc:
+        logger.debug("Tracing compatibility patch skipped: %s", exc)
+
+
+def _build_agent(client: AsyncOpenAI, model_name: str = MODEL_NAME) -> Agent:
     """Construct the coding ``Agent`` with all tools wired up.
 
     Args:
         client: The ``AsyncOpenAI`` client for NVIDIA NIM.
+        model_name: The model identifier to use for inference.
 
     Returns:
         A fully configured ``Agent`` instance.
     """
     model = OpenAIChatCompletionsModel(
-        model=MODEL_NAME,
+        model=model_name,
         openai_client=client,
     )
     return Agent(
@@ -407,27 +455,165 @@ async def run_once(agent: Agent, query: str) -> str:
     Returns:
         The agent's final text answer.
     """
+    logger.debug(
+        "Starting agent run (trace_include_sensitive_data=%s).",
+        TRACE_INCLUDE_SENSITIVE_DATA,
+    )
     with trace("Coding Agent Run"):
-        result = await Runner.run(agent, input=query)
+        result = await Runner.run(
+            agent,
+            input=query,
+            run_config=RunConfig(
+                trace_include_sensitive_data=TRACE_INCLUDE_SENSITIVE_DATA,
+            ),
+        )
     return result.final_output
 
 
-async def run_interactive(agent: Agent) -> None:
+def _truncate_text(value: str, limit: int = 400) -> str:
+    """Return a shortened single-line representation of text.
+
+    Args:
+        value: The input text to normalize.
+        limit: Maximum number of characters to retain.
+
+    Returns:
+        The normalized and truncated text.
+    """
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[:limit]} ...[truncated]"
+
+
+def _safe_json_preview(raw_value: Any, limit: int = 400) -> str:
+    """Serialize *raw_value* as JSON when possible for debug printing.
+
+    Args:
+        raw_value: Arbitrary object to format for console output.
+        limit: Maximum rendered length in characters.
+
+    Returns:
+        A compact string preview of the value.
+    """
+    try:
+        text = json.dumps(raw_value, ensure_ascii=True)
+    except (TypeError, ValueError):
+        text = str(raw_value)
+    return _truncate_text(text, limit=limit)
+
+
+def _extract_message_text(item: MessageOutputItem) -> str:
+    """Extract assistant output text from a message run item.
+
+    Args:
+        item: A message output item emitted by the SDK.
+
+    Returns:
+        Concatenated message text, if any.
+    """
+    content: Any = getattr(item.raw_item, "content", [])
+    text_parts: list[str] = []
+    for part in content:
+        text = getattr(part, "text", None)
+        if isinstance(text, str) and text.strip():
+            text_parts.append(text)
+    return "\n".join(text_parts).strip()
+
+
+def _format_stream_event(event: StreamEvent) -> str | None:
+    """Format a stream event as a concise debug line.
+
+    Args:
+        event: A stream event produced by ``RunResultStreaming.stream_events``.
+
+    Returns:
+        A printable debug string, or ``None`` when the event should be skipped.
+    """
+    if not isinstance(event, RunItemStreamEvent):
+        return None
+
+    if event.name == "tool_called" and isinstance(event.item, ToolCallItem):
+        raw_item = event.item.raw_item
+        tool_name: str = getattr(raw_item, "name", "<unknown_tool>")
+        arguments: Any = getattr(raw_item, "arguments", "")
+        return (
+            f"[tool_called] {tool_name} args="
+            f"{_safe_json_preview(arguments)}"
+        )
+
+    if event.name == "tool_output" and isinstance(event.item, ToolCallOutputItem):
+        output = _safe_json_preview(event.item.output)
+        return f"[tool_output] {output}"
+
+    if (
+        event.name == "message_output_created"
+        and isinstance(event.item, MessageOutputItem)
+    ):
+        text = _extract_message_text(event.item)
+        if not text:
+            return "[assistant_output] <empty>"
+        return f"[assistant_output] {_truncate_text(text)}"
+
+    if event.name == "reasoning_item_created" and isinstance(
+        event.item, ReasoningItem
+    ):
+        return "[reasoning] model reasoning item created"
+
+    return None
+
+
+async def run_once_with_event_debug(agent: Agent, query: str) -> str:
+    """Execute one run and print incremental agent I/O events.
+
+    Args:
+        agent: The ``Agent`` instance to run.
+        query: The user query string.
+
+    Returns:
+        The final output text from the completed run.
+    """
+    logger.debug(
+        "Starting streamed agent run (trace_include_sensitive_data=%s).",
+        TRACE_INCLUDE_SENSITIVE_DATA,
+    )
+    with trace("Coding Agent Run"):
+        streamed = Runner.run_streamed(
+            agent,
+            input=query,
+            run_config=RunConfig(
+                trace_include_sensitive_data=TRACE_INCLUDE_SENSITIVE_DATA,
+            ),
+        )
+        async for event in streamed.stream_events():
+            line = _format_stream_event(event)
+            if line is not None:
+                print(line)
+        return streamed.final_output
+
+
+async def run_interactive(
+    client: AsyncOpenAI, model_name: str, show_events: bool = False
+) -> None:
     """Run the agent in an interactive REPL.
 
     The user types queries and receives answers.  Type ``quit``, ``exit``,
     or ``q`` to stop.  Type ``/new`` to start a fresh session.
 
     Args:
-        agent: The ``Agent`` instance to use.
+        client: The configured ``AsyncOpenAI`` client.
+        model_name: Initial model identifier for the interactive session.
+        show_events: When ``True``, stream and print intermediate event logs.
     """
     session_id: int = 1
+    current_model_name: str = model_name
+    agent: Agent = _build_agent(client, model_name=current_model_name)
     print("=" * 64)
-    print(f"  Coding Agent ({MODEL_NAME}) — interactive mode")
+    print(f"  Coding Agent ({current_model_name}) — interactive mode")
     print(f"  Inference : NVIDIA NIM ({NVIDIA_BASE_URL})")
     print(f"  Workspace : {WORKSPACE_ROOT}")
     print(f"  Session   : {session_id}")
-    print("  Commands  : /new, quit")
+    print("  Commands  : /new, /model <name>, quit")
     print("=" * 64 + "\n")
 
     while True:
@@ -443,11 +629,28 @@ async def run_interactive(agent: Agent) -> None:
             session_id += 1
             print(f"\nStarted new session: {session_id}\n")
             continue
+        if user_input.startswith("/model"):
+            raw_model_name: str = user_input.removeprefix("/model").strip()
+            if not raw_model_name:
+                print(
+                    "\nUsage: /model <model_name>\n"
+                    f"Current model: {current_model_name}\n"
+                )
+                continue
+
+            current_model_name = raw_model_name
+            agent = _build_agent(client, model_name=current_model_name)
+            print(f"\nSwitched model to: {current_model_name}\n")
+            continue
         if user_input.lower() in {"quit", "exit", "q"}:
             print("Goodbye!")
             return
 
-        answer: str = await run_once(agent, user_input)
+        if show_events:
+            print()
+            answer = await run_once_with_event_debug(agent, user_input)
+        else:
+            answer = await run_once(agent, user_input)
         print(f"\nAgent:\n{answer}\n")
 
 
@@ -468,7 +671,11 @@ def main() -> None:
 Examples:
   %(prog)s "List all Python files in the workspace"
   %(prog)s "Find where model loading happens"
+  %(prog)s --model moonshotai/kimi-k2.5 "Find where model loading happens"
+  %(prog)s --show-events "Find where model loading happens"
   %(prog)s -i                    # Interactive mode
+  %(prog)s -i --model z-ai/glm4.7
+  %(prog)s -i --show-events      # Interactive + event stream
   %(prog)s -i -v                 # Interactive + verbose logging
         """,
     )
@@ -490,6 +697,22 @@ Examples:
         action="store_true",
         help="Enable verbose (DEBUG) logging.",
     )
+    parser.add_argument(
+        "--model",
+        default=MODEL_NAME,
+        help=(
+            "Model identifier for NVIDIA NIM inference. "
+            f"Default: {MODEL_NAME}"
+        ),
+    )
+    parser.add_argument(
+        "--show-events",
+        action="store_true",
+        help=(
+            "Print intermediate agent events (tool calls/outputs and "
+            "assistant message chunks)."
+        ),
+    )
 
     args: argparse.Namespace = parser.parse_args()
     _configure_logging(args.verbose)
@@ -497,11 +720,16 @@ Examples:
     # ---- setup ----
     _setup_tracing()
     client: AsyncOpenAI = _build_client()
-    agent: Agent = _build_agent(client)
 
     # ---- dispatch ----
     if args.interactive:
-        asyncio.run(run_interactive(agent))
+        asyncio.run(
+            run_interactive(
+                client,
+                model_name=args.model,
+                show_events=args.show_events,
+            )
+        )
         return
 
     if args.query is None:
@@ -512,7 +740,11 @@ Examples:
         )
         sys.exit(1)
 
-    answer: str = asyncio.run(run_once(agent, args.query))
+    agent: Agent = _build_agent(client, model_name=args.model)
+    if args.show_events:
+        answer = asyncio.run(run_once_with_event_debug(agent, args.query))
+    else:
+        answer = asyncio.run(run_once(agent, args.query))
     print(f"\nFinal Answer:\n{answer}")
 
 

@@ -17,9 +17,8 @@ Inference requests go to `https://integrate.api.nvidia.com/v1` using the `OpenAI
 ### 1. Install dependencies
 
 ```bash
-pip install openai-agents
-# or, if using the project requirements:
-pip install -r requirements.txt
+uv venv
+uv pip install -r requirements.txt
 ```
 
 ### 2. Set environment variables
@@ -37,14 +36,14 @@ export OPENAI_API_KEY="sk-..."
 ### One-shot query
 
 ```bash
-python openai_agentsdk/coding_agent.py "List all Python files in the workspace"
-python openai_agentsdk/coding_agent.py "Find where model loading happens"
+uv run python openai_agentsdk/coding_agent.py "List all Python files in the workspace"
+uv run python openai_agentsdk/coding_agent.py "Find where model loading happens"
 ```
 
 ### Interactive REPL
 
 ```bash
-python openai_agentsdk/coding_agent.py -i
+uv run python openai_agentsdk/coding_agent.py -i
 ```
 
 Inside the REPL, type `/new` to start a fresh session or `quit` to exit.
@@ -52,7 +51,7 @@ Inside the REPL, type `/new` to start a fresh session or `quit` to exit.
 ### Verbose logging
 
 ```bash
-python openai_agentsdk/coding_agent.py -i -v
+uv run python openai_agentsdk/coding_agent.py -i -v
 ```
 
 ## Available Tools

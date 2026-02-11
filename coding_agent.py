@@ -12,6 +12,7 @@ import argparse
 import ast
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from typing import Any
 from mlx_lm import generate as lm_generate
 from mlx_lm import load as lm_load
 from mlx_lm.sample_utils import make_sampler
+from openai import OpenAI
 
 logger = logging.getLogger("coding_agent")
 
@@ -43,7 +45,10 @@ def _configure_logging(verbose: bool = False) -> None:
 MODEL_PRESETS: dict[str, str] = {
     "qwen": "mlx-community/Qwen3-4B-8bit",
     "gemma": "mlx-community/gemma-3-4b-it-8bit",
+    "kimi_nvidia": "moonshotai/kimi-k2.5",
 }
+NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+MODEL_NAME: str = "moonshotai/kimi-k2.5"
 DEFAULT_MODEL_NAME: str = "qwen"
 MODEL_PATH: str = MODEL_PRESETS[DEFAULT_MODEL_NAME]
 WORKSPACE_ROOT: Path = Path.cwd().resolve()
@@ -368,13 +373,34 @@ class CodingAgent:
         self.temperature = temperature
         self.max_iterations = max_iterations
         self.verbose = verbose
+        self._uses_nvidia_api: bool = self.model_path == MODEL_NAME
 
         _configure_logging(verbose)
         self._model: Any = None
         self._tokenizer: Any = None
         self._sampler: Any = None
+        self._remote_client: OpenAI | None = None
 
     def _ensure_loaded(self) -> None:
+        """Initialize either MLX local model or NVIDIA-hosted API client."""
+        if self._uses_nvidia_api:
+            if self._remote_client is not None:
+                return
+            api_key: str = os.environ.get("NVIDIA_API_KEY", "")
+            if not api_key:
+                raise RuntimeError(
+                    "NVIDIA_API_KEY is required when using model "
+                    f"'{self.model_path}'."
+                )
+            print(f"Connecting to NVIDIA API: {NVIDIA_BASE_URL}")
+            print(f"Using remote model: {self.model_path}")
+            self._remote_client = OpenAI(
+                base_url=NVIDIA_BASE_URL,
+                api_key=api_key,
+            )
+            print("NVIDIA API client ready.\n")
+            return
+
         if self._model is not None:
             return
         print(f"Loading model: {self.model_path}")
@@ -393,6 +419,7 @@ class CodingAgent:
         )
 
     def _generate(self, prompt: str) -> str:
+        """Generate a completion from the local MLX model."""
         return lm_generate(
             self._model,
             self._tokenizer,
@@ -401,6 +428,20 @@ class CodingAgent:
             sampler=self._sampler,
             verbose=False,
         )
+
+    def _generate_via_nvidia_api(self, messages: list[dict[str, str]]) -> str:
+        """Generate a completion from NVIDIA's OpenAI-compatible API."""
+        if self._remote_client is None:
+            raise RuntimeError("NVIDIA API client is not initialized.")
+
+        completion = self._remote_client.chat.completions.create(
+            model=self.model_path,
+            messages=messages,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+        )
+        message_content: str | None = completion.choices[0].message.content
+        return message_content or ""
 
     def _normalize_tool_call(self, raw_call: Any) -> dict[str, Any] | None:
         """Normalize various tool-call shapes to {'name': str, 'arguments': dict}."""
@@ -691,8 +732,11 @@ class CodingAgent:
 
         start = time.perf_counter()
         for iteration in range(1, self.max_iterations + 1):
-            prompt = self._format_prompt(messages)
-            response = self._generate(prompt)
+            if self._uses_nvidia_api:
+                response = self._generate_via_nvidia_api(messages)
+            else:
+                prompt = self._format_prompt(messages)
+                response = self._generate(prompt)
 
             print(f"\n--- Iteration {iteration} ---")
             print(f"Model output:\n{response}")
