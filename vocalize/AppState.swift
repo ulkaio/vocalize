@@ -10,7 +10,7 @@ final class AppState: ObservableObject {
     @Published var isDictating = false
     @Published var speed: Double = 1.5
     @Published var voice: String = "af_heart"
-    @Published var serverURL: String = "http://localhost:8000"
+    @Published var serverURL: String = "http://localhost:8009"
     @Published var statusText: String = "Idle"
 
     // MARK: - TTS Components
@@ -32,14 +32,9 @@ final class AppState: ObservableObject {
     init() {
         FileLogger.shared.logSync("AppState initialized")
 
-        // TTS hotkey (Option+Esc)
+        // TTS hotkey (Option+Esc): speak when idle, toggle pause/resume when active.
         hotkeyManager.onHotkey = { [weak self] in
-            guard let self else { return }
-            if self.isPlaying {
-                self.stop()
-            } else {
-                self.speakSelection()
-            }
+            self?.toggleSpeakPauseResume()
         }
         hotkeyManager.registerHotkey()
 
@@ -51,6 +46,18 @@ final class AppState: ObservableObject {
             self?.stopDictationAndPaste()
         }
         fnKeyMonitor.start()
+    }
+
+    func toggleSpeakPauseResume() {
+        if isPlaying {
+            if isPaused {
+                resume()
+            } else {
+                pause()
+            }
+        } else {
+            speakSelection()
+        }
     }
 
     // MARK: - Dictation Methods

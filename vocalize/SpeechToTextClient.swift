@@ -47,7 +47,7 @@ final class SpeechToTextClient {
     ///
     /// - Parameters:
     ///   - audioURL: URL of the audio file to transcribe.
-    ///   - serverURL: Base URL of the server (e.g., "http://localhost:8000").
+    ///   - serverURL: Base URL of the server (e.g., "http://localhost:8009").
     ///   - model: Whisper model to use (default: "base").
     ///   - completion: Called with the transcribed text or an error.
     func transcribe(

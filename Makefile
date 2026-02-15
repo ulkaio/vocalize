@@ -6,7 +6,7 @@ VENV := .venv
 PYTHON := $(VENV)/bin/python
 PID_FILE := .server.pid
 LOG_FILE := server.log
-PORT := 8000
+PORT := 8009
 KOKORO_DIR := models/kokoro
 KOKORO_FP16 := $(KOKORO_DIR)/kokoro-v1.0.fp16-gpu.onnx
 KOKORO_VOICES := $(KOKORO_DIR)/voices-v1.0.bin
@@ -43,7 +43,7 @@ start:  ## Start server in background (TTS only)
 		echo "Server already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
 		echo "Starting server on port $(PORT)..."; \
-		nohup $(PYTHON) serve.py --tts --stt --port $(PORT) > $(LOG_FILE) 2>&1 & \
+		nohup $(PYTHON) serve.py --tts --port $(PORT) > $(LOG_FILE) 2>&1 & \
 		echo $$! > $(PID_FILE); \
 		sleep 2; \
 		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \

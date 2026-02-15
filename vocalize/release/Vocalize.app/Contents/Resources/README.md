@@ -5,7 +5,7 @@ macOS menu bar app for voice interactions: **Text-to-Speech** (TTS) and **Speech
 ## Features
 
 ### Text-to-Speech
-- **Global hotkey**: Option+Esc to speak selected text
+- **Global hotkey**: Option+Esc to speak selection, pause, or resume
 - Streams audio from `/v1/audio/speech` endpoint
 - Play/pause/stop controls
 - Adjustable voice and speed
@@ -69,7 +69,7 @@ python serve.py --tts --stt
 
 ### TTS Endpoint
 ```
-POST http://localhost:8000/v1/audio/speech
+POST http://localhost:8009/v1/audio/speech
 ```
 ```json
 {
@@ -82,7 +82,7 @@ POST http://localhost:8000/v1/audio/speech
 
 ### STT Endpoint
 ```
-POST http://localhost:8000/v1/audio/transcriptions
+POST http://localhost:8009/v1/audio/transcriptions
 Content-Type: multipart/form-data
 file: <audio.wav>
 ```
@@ -91,7 +91,7 @@ file: <audio.wav>
 
 | Action | Hotkey |
 |--------|--------|
-| Speak selected text | Option + Esc |
+| Speak selection / pause / resume | Option + Esc |
 | Dictate and paste | Hold Fn, release to paste |
 
 ## Logging
@@ -104,7 +104,7 @@ tail -f ~/Library/Logs/Vocalize.log
 - **No text selected**: Enable Accessibility permission
 - **Microphone permission denied**: Enable Microphone permission
 - **Paste not working**: Enable Accessibility permission
-- **No audio**: Verify backend is running at `http://localhost:8000`
+- **No audio**: Verify backend is running at `http://localhost:8009`
 - **Repeated permission prompts**: Install to `/Applications`
 
 ## Project Files

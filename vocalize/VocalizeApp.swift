@@ -69,8 +69,8 @@ struct VocalizeApp: App {
 
                 // Hotkey hints
                 VStack(alignment: .leading, spacing: 4) {
-                    Button("Speak Selection (⌥ Esc)") {
-                        appState.speakSelection()
+                    Button("Speak / Pause / Resume (⌥ Esc)") {
+                        appState.toggleSpeakPauseResume()
                     }
                     Text("Hold Fn to dictate")
                         .font(.caption2)

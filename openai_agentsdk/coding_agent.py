@@ -85,8 +85,9 @@ def _configure_logging(verbose: bool = False) -> None:
 
 NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
 # MODEL_NAME: str = "qwen/qwen3-next-80b-a3b-instruct"
-# MODEL_NAME: str = "z-ai/glm4.7"
-MODEL_NAME: str = "moonshotai/kimi-k2.5"
+MODEL_NAME: str = "z-ai/glm5"
+# minimaxai/minimax-m2.1
+# MODEL_NAME: str = "moonshotai/kimi-k2.5"
 WORKSPACE_ROOT: Path = Path.cwd().resolve()
 TRACE_INCLUDE_SENSITIVE_DATA: bool = True
 

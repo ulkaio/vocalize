@@ -211,7 +211,7 @@ class TTSRequest(BaseModel):
     """Request body for text-to-speech."""
 
     input: str = Field(..., description="Text to convert to speech")
-    voice: str = Field(default="af_bella", description="Voice ID to use")
+    voice: str = Field(default="af_heart", description="Voice ID to use")
     speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Speech speed")
     response_format: str = Field(default="wav", description="Audio format (wav)")
     stream: bool = Field(default=False, description="Stream audio as it is generated")
